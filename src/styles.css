@@ -162,6 +162,11 @@ h2 {
   width: 40px;
 }
 
+.icon-button.small {
+  min-height: 32px;
+  width: 32px;
+}
+
 .userbox,
 .section-title {
   align-items: center;
@@ -183,12 +188,33 @@ h2 {
   margin-top: 18px;
 }
 
+.field-section {
+  border-top: 1px solid #dce3de;
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding-top: 14px;
+}
+
+.field-section h3 {
+  color: #17633e;
+  font-size: 0.95rem;
+  margin-bottom: 0;
+}
+
 label span {
   color: #33443b;
   display: block;
   font-size: 0.86rem;
   font-weight: 700;
   margin-bottom: 6px;
+}
+
+label small {
+  color: #65746c;
+  display: block;
+  font-size: 0.76rem;
+  line-height: 1.3;
+  margin-top: 5px;
 }
 
 input,
@@ -213,12 +239,19 @@ input:read-only {
   padding: 10px 12px;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .primary {
   min-width: 210px;
 }
 
 .primary:disabled,
-.icon-button:disabled {
+.icon-button:disabled,
+.ghost:disabled {
   cursor: wait;
   opacity: 0.65;
 }
@@ -233,6 +266,13 @@ input:read-only {
   border: 1px solid #dce3de;
   border-radius: 8px;
   padding: 12px;
+}
+
+.record-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
 }
 
 .records span {

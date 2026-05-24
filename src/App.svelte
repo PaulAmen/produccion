@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { BookOpen, FileText, LibraryBig, LogOut, Plus, RefreshCw, Save } from 'lucide-svelte';
+  import { BookOpen, FileText, LibraryBig, LogOut, Pencil, Plus, RefreshCw, Save } from 'lucide-svelte';
   import carreras from './data/carreras.json';
+  import carreraAliases from './data/carrera-aliases.json';
   import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID } from './config';
   import { createPublication, listPublications } from './lib/api';
   import { fieldsByType, publicationTypes } from './lib/fields';
@@ -9,10 +10,12 @@
   let user = null;
   let idToken = '';
   let activeType = 'articulo';
+  let currentRecordId = '';
   let values = {};
   let records = [];
   let loading = false;
   let saving = false;
+  let draftSaving = false;
   let error = '';
   let message = '';
 
@@ -24,6 +27,10 @@
 
   $: activeFields = fieldsByType[activeType];
   $: selectedCareer = carreras.find((item) => item.carrera === values.CARRERA);
+  $: facultades = [...new Set(carreras.map((item) => item.facultad))].sort();
+  $: filteredCarreras = values.FACULTAD
+    ? carreras.filter((item) => item.facultad === values.FACULTAD)
+    : carreras;
 
   onMount(() => {
     resetForm();
@@ -99,6 +106,7 @@
       nextValues[field.name] = field.defaultValue || '';
     }
     values = nextValues;
+    currentRecordId = '';
   }
 
   function setType(type) {
@@ -107,27 +115,67 @@
     resetForm();
   }
 
+  function editRecord(record) {
+    activeType = record.publicationType;
+    currentRecordId = record.id;
+    const nextValues = {};
+    for (const field of fieldsByType[record.publicationType]) {
+      nextValues[field.name] = record.values?.[field.name] || field.defaultValue || '';
+    }
+    if (nextValues.CARRERA) {
+      nextValues.CARRERA = carreraAliases[nextValues.CARRERA] || nextValues.CARRERA;
+      const career = carreras.find((item) => item.carrera === nextValues.CARRERA);
+      nextValues.FACULTAD = career?.facultad || nextValues.FACULTAD;
+    }
+    if (!nextValues.TITULO_PROYECTO_INVESTIGACION && record.values?.TITULO_PROYECTO && record.values?.['RESULTADO DE PROYECTO DE INVESTIGACION'] === 'SI') {
+      nextValues.TITULO_PROYECTO_INVESTIGACION = record.values.TITULO_PROYECTO;
+    }
+    if (!nextValues.TITULO_PROYECTO_VINCULACION && record.values?.TITULO_PROYECTO && record.values?.['RESULTADO DE PROYECTO DE VINCULACION'] === 'SI') {
+      nextValues.TITULO_PROYECTO_VINCULACION = record.values.TITULO_PROYECTO;
+    }
+    values = nextValues;
+    message = 'Registro cargado para edicion.';
+    error = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function updateValue(field, rawValue) {
-    const value = field.uppercase ? rawValue.toUpperCase() : rawValue;
+    const normalizedNumber = field.type === 'number' && field.min
+      ? String(Math.max(Number(rawValue || field.min), field.min))
+      : rawValue;
+    const value = field.uppercase ? normalizedNumber.toUpperCase() : normalizedNumber;
     values = { ...values, [field.name]: value };
+    if (field.type === 'faculty') {
+      const career = carreras.find((item) => item.carrera === values.CARRERA);
+      values = {
+        ...values,
+        FACULTAD: value,
+        CARRERA: career?.facultad === value ? values.CARRERA : ''
+      };
+    }
     if (field.type === 'career') {
       const career = carreras.find((item) => item.carrera === value);
       values = { ...values, CARRERA: value, FACULTAD: career?.facultad || '' };
     }
   }
 
-  async function submitForm() {
-    saving = true;
+  async function submitForm(status = 'COMPLETO') {
+    if (status === 'INCOMPLETO') draftSaving = true;
+    else saving = true;
     error = '';
     message = '';
     try {
-      await createPublication(idToken, activeType, values);
-      message = 'Registro guardado correctamente.';
-      resetForm();
+      const data = await createPublication(idToken, activeType, { ...values, ID: currentRecordId }, status);
+      currentRecordId = data.id || currentRecordId;
+      message = status === 'INCOMPLETO'
+        ? 'Formulario incompleto guardado como borrador.'
+        : 'Registro completo guardado correctamente.';
+      if (status === 'COMPLETO') resetForm();
       await loadRecords();
     } catch (err) {
       error = err.message;
     } finally {
+      draftSaving = false;
       saving = false;
     }
   }
@@ -186,22 +234,34 @@
           </button>
         </div>
 
-        <form on:submit|preventDefault={submitForm}>
+        <form on:submit|preventDefault={() => submitForm('COMPLETO')}>
           <div class="form-grid">
-            {#each activeFields as field}
+            {#each activeFields as field, index}
+              {#if field.section && field.section !== activeFields[index - 1]?.section}
+                <div class="field-section">
+                  <h3>{field.section}</h3>
+                </div>
+              {/if}
               <label>
                 <span>{field.label}</span>
                 {#if field.type === 'readonly'}
-                  <input value={values[field.name] || ''} readonly required />
+                  <input value={values[field.name] || ''} readonly />
+                {:else if field.type === 'faculty'}
+                  <select value={values.FACULTAD || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
+                    <option value="" disabled>Seleccione una facultad</option>
+                    {#each facultades as facultad}
+                      <option value={facultad}>{facultad}</option>
+                    {/each}
+                  </select>
                 {:else if field.type === 'career'}
-                  <select value={values.CARRERA || ''} required on:change={(event) => updateValue(field, event.currentTarget.value)}>
+                  <select value={values.CARRERA || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
                     <option value="" disabled>Seleccione una carrera</option>
-                    {#each carreras as item}
+                    {#each filteredCarreras as item}
                       <option value={item.carrera}>{item.carrera}</option>
                     {/each}
                   </select>
                 {:else if field.options}
-                  <select value={values[field.name] || ''} required on:change={(event) => updateValue(field, event.currentTarget.value)}>
+                  <select value={values[field.name] || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
                     <option value="" disabled>Seleccione</option>
                     {#each field.options as option}
                       <option value={option}>{option}</option>
@@ -210,10 +270,13 @@
                 {:else}
                   <input
                     type={field.type || 'text'}
+                    min={field.min}
                     value={values[field.name] || ''}
-                    required
                     on:input={(event) => updateValue(field, event.currentTarget.value)}
                   />
+                {/if}
+                {#if field.hint}
+                  <small>{field.hint}</small>
                 {/if}
               </label>
             {/each}
@@ -221,10 +284,16 @@
           {#if selectedCareer}
             <p class="career-note">Facultad asignada: <strong>{selectedCareer.facultad}</strong></p>
           {/if}
-          <button class="primary" type="submit" disabled={saving}>
-            <Save size={18} />
-            {saving ? 'Guardando...' : 'Guardar publicacion'}
-          </button>
+          <div class="actions">
+            <button class="ghost" type="button" disabled={draftSaving || saving} on:click={() => submitForm('INCOMPLETO')}>
+              <Save size={18} />
+              {draftSaving ? 'Guardando...' : 'Guardar borrador'}
+            </button>
+            <button class="primary" type="submit" disabled={saving || draftSaving}>
+              <Save size={18} />
+              {saving ? 'Guardando...' : 'Guardar completo'}
+            </button>
+          </div>
         </form>
       </section>
 
@@ -246,7 +315,12 @@
           <div class="records">
             {#each records as record}
               <article>
-                <span>{record.type}</span>
+                <div class="record-head">
+                  <span>{record.type} · {record.status}</span>
+                  <button class="icon-button small" type="button" title="Editar registro" on:click={() => editRecord(record)}>
+                    <Pencil size={16} />
+                  </button>
+                </div>
                 <h3>{record.title}</h3>
                 <p>{record.date || 'Sin fecha'} · {record.career || 'Sin carrera'}</p>
               </article>
