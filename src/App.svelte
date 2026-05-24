@@ -1,11 +1,12 @@
 <script>
   import { onMount } from 'svelte';
   import { BookOpen, FileText, LibraryBig, LogOut, Pencil, Plus, RefreshCw, Save } from 'lucide-svelte';
-  import carreras from './data/carreras.json';
-  import carreraAliases from './data/carrera-aliases.json';
   import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID } from './config';
   import { createPublication, listPublications } from './lib/api';
+  import { decodeJwt, initGoogleSignIn, isAllowedProfile } from './lib/auth';
+  import { applyCareerChange, applyFacultyChange, faculties, findCareer, getCareersByFaculty } from './lib/careers';
   import { fieldsByType, publicationTypes } from './lib/fields';
+  import { createInitialValues, createValuesFromRecord, normalizeFieldValue } from './lib/form-state';
 
   let user = null;
   let idToken = '';
@@ -26,11 +27,8 @@
   };
 
   $: activeFields = fieldsByType[activeType];
-  $: selectedCareer = carreras.find((item) => item.carrera === values.CARRERA);
-  $: facultades = [...new Set(carreras.map((item) => item.facultad))].sort();
-  $: filteredCarreras = values.FACULTAD
-    ? carreras.filter((item) => item.facultad === values.FACULTAD)
-    : carreras;
+  $: selectedCareer = findCareer(values.CARRERA);
+  $: filteredCarreras = getCareersByFaculty(values.FACULTAD);
 
   onMount(() => {
     resetForm();
@@ -38,39 +36,20 @@
   });
 
   function initGoogle() {
-    if (!GOOGLE_CLIENT_ID) {
-      error = 'Falta configurar VITE_GOOGLE_CLIENT_ID.';
-      return;
-    }
-
-    const timer = setInterval(() => {
-      if (!window.google?.accounts?.id) return;
-      clearInterval(timer);
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredential,
-        hosted_domain: ALLOWED_DOMAIN
-      });
-      window.google.accounts.id.renderButton(document.getElementById('googleSignIn'), {
-        theme: 'outline',
-        size: 'large',
-        text: 'signin_with',
-        shape: 'rectangular',
-        width: 280
-      });
-    }, 150);
-  }
-
-  function decodeJwt(token) {
-    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(decodeURIComponent(escape(window.atob(payload))));
+    initGoogleSignIn({
+      clientId: GOOGLE_CLIENT_ID,
+      buttonId: 'googleSignIn',
+      callback: handleCredential
+    }).catch((err) => {
+      error = err.message;
+    });
   }
 
   async function handleCredential(response) {
     error = '';
     message = '';
     const profile = decodeJwt(response.credential);
-    if (profile.hd !== ALLOWED_DOMAIN || !profile.email?.endsWith(`@${ALLOWED_DOMAIN}`)) {
+    if (!isAllowedProfile(profile)) {
       error = `Solo se permite el ingreso con cuentas del dominio ${ALLOWED_DOMAIN}.`;
       return;
     }
@@ -100,63 +79,37 @@
     }
   }
 
-  function resetForm() {
-    const nextValues = {};
-    for (const field of fieldsByType[activeType]) {
-      nextValues[field.name] = field.defaultValue || '';
-    }
-    values = nextValues;
+  function resetForm(type = activeType) {
+    values = createInitialValues(type);
     currentRecordId = '';
   }
 
   function setType(type) {
     activeType = type;
     message = '';
-    resetForm();
+    resetForm(type);
   }
 
   function editRecord(record) {
     activeType = record.publicationType;
     currentRecordId = record.id;
-    const nextValues = {};
-    for (const field of fieldsByType[record.publicationType]) {
-      nextValues[field.name] = record.values?.[field.name] || field.defaultValue || '';
-    }
-    if (nextValues.CARRERA) {
-      nextValues.CARRERA = carreraAliases[nextValues.CARRERA] || nextValues.CARRERA;
-      const career = carreras.find((item) => item.carrera === nextValues.CARRERA);
-      nextValues.FACULTAD = career?.facultad || nextValues.FACULTAD;
-    }
-    if (!nextValues.TITULO_PROYECTO_INVESTIGACION && record.values?.TITULO_PROYECTO && record.values?.['RESULTADO DE PROYECTO DE INVESTIGACION'] === 'SI') {
-      nextValues.TITULO_PROYECTO_INVESTIGACION = record.values.TITULO_PROYECTO;
-    }
-    if (!nextValues.TITULO_PROYECTO_VINCULACION && record.values?.TITULO_PROYECTO && record.values?.['RESULTADO DE PROYECTO DE VINCULACION'] === 'SI') {
-      nextValues.TITULO_PROYECTO_VINCULACION = record.values.TITULO_PROYECTO;
-    }
-    values = nextValues;
+    values = createValuesFromRecord(record);
     message = 'Registro cargado para edicion.';
     error = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function updateValue(field, rawValue) {
-    const normalizedNumber = field.type === 'number' && field.min
-      ? String(Math.max(Number(rawValue || field.min), field.min))
-      : rawValue;
-    const value = field.uppercase ? normalizedNumber.toUpperCase() : normalizedNumber;
-    values = { ...values, [field.name]: value };
+    const value = normalizeFieldValue(field, rawValue);
     if (field.type === 'faculty') {
-      const career = carreras.find((item) => item.carrera === values.CARRERA);
-      values = {
-        ...values,
-        FACULTAD: value,
-        CARRERA: career?.facultad === value ? values.CARRERA : ''
-      };
+      values = applyFacultyChange(values, value);
+      return;
     }
     if (field.type === 'career') {
-      const career = carreras.find((item) => item.carrera === value);
-      values = { ...values, CARRERA: value, FACULTAD: career?.facultad || '' };
+      values = applyCareerChange(values, value);
+      return;
     }
+    values = { ...values, [field.name]: value };
   }
 
   async function submitForm(status = 'COMPLETO') {
@@ -249,7 +202,7 @@
                 {:else if field.type === 'faculty'}
                   <select value={values.FACULTAD || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
                     <option value="" disabled>Seleccione una facultad</option>
-                    {#each facultades as facultad}
+                    {#each faculties as facultad}
                       <option value={facultad}>{facultad}</option>
                     {/each}
                   </select>
