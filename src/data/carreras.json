@@ -1,0 +1,14 @@
+[
+  { "facultad": "Ciencias Tecnicas", "carrera": "Tecnologias de la Informacion" },
+  { "facultad": "Ciencias Tecnicas", "carrera": "Ingenieria Civil" },
+  { "facultad": "Ciencias Tecnicas", "carrera": "Ingenieria en Computacion y Redes" },
+  { "facultad": "Ciencias Economicas", "carrera": "Administracion de Empresas" },
+  { "facultad": "Ciencias Economicas", "carrera": "Contabilidad y Auditoria" },
+  { "facultad": "Ciencias Economicas", "carrera": "Turismo" },
+  { "facultad": "Ciencias de la Salud", "carrera": "Enfermeria" },
+  { "facultad": "Ciencias de la Salud", "carrera": "Laboratorio Clinico" },
+  { "facultad": "Ciencias Naturales y de la Agricultura", "carrera": "Ingenieria Ambiental" },
+  { "facultad": "Ciencias Naturales y de la Agricultura", "carrera": "Agropecuaria" },
+  { "facultad": "Ciencias Sociales, Humanisticas y de la Educacion", "carrera": "Educacion" },
+  { "facultad": "Ciencias Sociales, Humanisticas y de la Educacion", "carrera": "Comunicacion" }
+]
