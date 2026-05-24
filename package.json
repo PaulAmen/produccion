@@ -10,6 +10,11 @@
   },
   "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.0",
+    "tailwind-variants": "^1.0.0",
+    "tw-animate-css": "^1.3.0",
     "vite": "^6.0.0",
     "svelte": "^5.0.0",
     "lucide-svelte": "^0.468.0"

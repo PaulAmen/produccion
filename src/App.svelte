@@ -7,6 +7,11 @@
   import { applyCareerChange, applyFacultyChange, faculties, findCareer, getCareersByFaculty } from './lib/careers';
   import { fieldsByType, publicationTypes } from './lib/fields';
   import { createInitialValues, createValuesFromRecord, normalizeFieldValue } from './lib/form-state';
+  import { Button } from '$lib/components/ui/button';
+  import { Card } from '$lib/components/ui/card';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Select } from '$lib/components/ui/select';
 
   let user = null;
   let idToken = '';
@@ -146,9 +151,9 @@
           <strong>{user.name}</strong>
           <span>{user.email}</span>
         </div>
-        <button class="icon-button" type="button" title="Cerrar sesion" on:click={signOut}>
+        <Button variant="outline" size="icon" title="Cerrar sesion" onclick={signOut}>
           <LogOut size={18} />
-        </button>
+        </Button>
       </div>
     {/if}
   </header>
@@ -163,7 +168,7 @@
     </section>
   {:else}
     <section class="workspace">
-      <aside class="panel sidebar">
+      <Card class="sidebar">
         <p class="label">Tipo de publicacion</p>
         <div class="type-list">
           {#each publicationTypes as type}
@@ -173,18 +178,18 @@
             </button>
           {/each}
         </div>
-      </aside>
+      </Card>
 
-      <section class="panel form-panel">
+      <Card class="form-panel">
         <div class="section-title">
           <div>
             <p class="label">Nuevo registro</p>
             <h2>{publicationTypes.find((type) => type.id === activeType).label}</h2>
           </div>
-          <button class="ghost" type="button" on:click={resetForm}>
+          <Button variant="outline" onclick={() => resetForm()}>
             <Plus size={17} />
             Limpiar
-          </button>
+          </Button>
         </div>
 
         <form on:submit|preventDefault={() => submitForm('COMPLETO')}>
@@ -195,70 +200,70 @@
                   <h3>{field.section}</h3>
                 </div>
               {/if}
-              <label>
+              <Label>
                 <span>{field.label}</span>
                 {#if field.type === 'readonly'}
-                  <input value={values[field.name] || ''} readonly />
+                  <Input value={values[field.name] || ''} readonly />
                 {:else if field.type === 'faculty'}
-                  <select value={values.FACULTAD || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
+                  <Select value={values.FACULTAD || ''} onchange={(event) => updateValue(field, event.currentTarget.value)}>
                     <option value="" disabled>Seleccione una facultad</option>
                     {#each faculties as facultad}
                       <option value={facultad}>{facultad}</option>
                     {/each}
-                  </select>
+                  </Select>
                 {:else if field.type === 'career'}
-                  <select value={values.CARRERA || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
+                  <Select value={values.CARRERA || ''} onchange={(event) => updateValue(field, event.currentTarget.value)}>
                     <option value="" disabled>Seleccione una carrera</option>
                     {#each filteredCarreras as item}
                       <option value={item.carrera}>{item.carrera}</option>
                     {/each}
-                  </select>
+                  </Select>
                 {:else if field.options}
-                  <select value={values[field.name] || ''} on:change={(event) => updateValue(field, event.currentTarget.value)}>
+                  <Select value={values[field.name] || ''} onchange={(event) => updateValue(field, event.currentTarget.value)}>
                     <option value="" disabled>Seleccione</option>
                     {#each field.options as option}
                       <option value={option}>{option}</option>
                     {/each}
-                  </select>
+                  </Select>
                 {:else}
-                  <input
+                  <Input
                     type={field.type || 'text'}
                     min={field.min}
                     value={values[field.name] || ''}
-                    on:input={(event) => updateValue(field, event.currentTarget.value)}
+                    oninput={(event) => updateValue(field, event.currentTarget.value)}
                   />
                 {/if}
                 {#if field.hint}
                   <small>{field.hint}</small>
                 {/if}
-              </label>
+              </Label>
             {/each}
           </div>
           {#if selectedCareer}
             <p class="career-note">Facultad asignada: <strong>{selectedCareer.facultad}</strong></p>
           {/if}
           <div class="actions">
-            <button class="ghost" type="button" disabled={draftSaving || saving} on:click={() => submitForm('INCOMPLETO')}>
+            <Button variant="outline" disabled={draftSaving || saving} onclick={() => submitForm('INCOMPLETO')}>
               <Save size={18} />
               {draftSaving ? 'Guardando...' : 'Guardar borrador'}
-            </button>
-            <button class="primary" type="submit" disabled={saving || draftSaving}>
+            </Button>
+            <Button type="submit" disabled={saving || draftSaving}>
               <Save size={18} />
               {saving ? 'Guardando...' : 'Guardar completo'}
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
 
-      <section class="panel records-panel">
+      <Card class="records-panel">
         <div class="section-title">
           <div>
             <p class="label">Mis registros</p>
             <h2>{records.length} publicaciones</h2>
           </div>
-          <button class="icon-button" type="button" title="Actualizar" on:click={loadRecords} disabled={loading}>
+          <Button variant="outline" size="icon" title="Actualizar" onclick={loadRecords} disabled={loading}>
             <RefreshCw size={18} />
-          </button>
+          </Button>
         </div>
         {#if loading}
           <p class="empty">Cargando registros...</p>
@@ -270,9 +275,9 @@
               <article>
                 <div class="record-head">
                   <span>{record.type} · {record.status}</span>
-                  <button class="icon-button small" type="button" title="Editar registro" on:click={() => editRecord(record)}>
+                  <Button variant="outline" size="smIcon" title="Editar registro" onclick={() => editRecord(record)}>
                     <Pencil size={16} />
-                  </button>
+                  </Button>
                 </div>
                 <h3>{record.title}</h3>
                 <p>{record.date || 'Sin fecha'} · {record.career || 'Sin carrera'}</p>
@@ -280,7 +285,7 @@
             {/each}
           </div>
         {/if}
-      </section>
+      </Card>
     </section>
   {/if}
 
