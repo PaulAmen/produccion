@@ -6,7 +6,7 @@
 
 <section
   class={cn(
-    'rounded-lg border border-[#d7ded9] bg-white shadow-[0_12px_32px_rgba(21,32,28,0.08)]',
+    'rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] shadow-[var(--shadow-md)] overflow-hidden transition-all duration-300',
     className
   )}
   {...restProps}

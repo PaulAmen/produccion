@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { BookOpen, FileText, LibraryBig, LogOut, Pencil, Plus, RefreshCw, Save } from 'lucide-svelte';
+  import { BookOpen, FileText, LibraryBig, LogOut, Pencil, Plus, RefreshCw, Save, Sun, Moon, CheckCircle2, AlertCircle } from 'lucide-svelte';
   import { ALLOWED_DOMAIN, GOOGLE_CLIENT_ID } from './config';
   import { createPublication, listPublications } from './lib/api';
   import { decodeJwt, initGoogleSignIn, isAllowedProfile } from './lib/auth';
@@ -24,6 +24,9 @@
   let draftSaving = false;
   let error = '';
   let message = '';
+  let isDark = false;
+  let searchQuery = '';
+  let statusFilter = 'ALL';
 
   const icons = {
     articulo: FileText,
@@ -35,10 +38,68 @@
   $: selectedCareer = findCareer(values.CARRERA);
   $: filteredCarreras = getCareersByFaculty(values.FACULTAD);
 
+  // Dynamic progress calculation for form completion
+  $: requiredFields = activeFields.filter(f => {
+    if (f.type === 'readonly') return false;
+
+    if (f.name === 'TITULO_PROYECTO_INVESTIGACION' || f.name === 'ESTADO_PROYECTO_INVESTIGACION') {
+      return values['RESULTADO DE PROYECTO DE INVESTIGACION'] === 'SI';
+    }
+
+    if (f.name === 'TITULO_PROYECTO_VINCULACION' || f.name === 'ESTADO_PROYECTO_VINCULACION') {
+      return values['RESULTADO DE PROYECTO DE VINCULACION'] === 'SI';
+    }
+
+    return true;
+  });
+
+  $: filledFieldsCount = requiredFields.filter(f => {
+    const val = values[f.name];
+    return val !== undefined && val !== null && String(val).trim() !== '';
+  }).length;
+
+  $: completenessPercentage = requiredFields.length > 0
+    ? Math.round((filledFieldsCount / requiredFields.length) * 100)
+    : 0;
+
+  // Dynamic search and filter logic
+  $: filteredRecords = records.filter(record => {
+    if (statusFilter !== 'ALL') {
+      const isComplete = record.status === 'COMPLETO';
+      if (statusFilter === 'COMPLETO' && !isComplete) return false;
+      if (statusFilter === 'INCOMPLETO' && isComplete) return false;
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      return (
+        (record.title || '').toLowerCase().includes(query) ||
+        (record.type || '').toLowerCase().includes(query) ||
+        (record.career || '').toLowerCase().includes(query) ||
+        (record.status || '').toLowerCase().includes(query) ||
+        (record.date || '').toLowerCase().includes(query)
+      );
+    }
+    return true;
+  });
+
   onMount(() => {
     resetForm();
     initGoogle();
+    
+    // Theme sync
+    isDark = document.documentElement.classList.contains('dark');
   });
+
+  function toggleTheme() {
+    isDark = !isDark;
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }
 
   function initGoogle() {
     initGoogleSignIn({
@@ -99,7 +160,7 @@
     activeType = record.publicationType;
     currentRecordId = record.id;
     values = createValuesFromRecord(record);
-    message = 'Registro cargado para edicion.';
+    message = 'Registro cargado para edición.';
     error = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -137,42 +198,68 @@
       saving = false;
     }
   }
+
+  function handleFormSubmit(event) {
+    event.preventDefault();
+    submitForm('COMPLETO');
+  }
 </script>
 
 <main>
   <header class="topbar">
-    <div>
-      <p class="eyebrow">UNESUM</p>
-      <h1>Produccion cientifica docente</h1>
-    </div>
-    {#if user}
-      <div class="userbox">
-        <div>
-          <strong>{user.name}</strong>
-          <span>{user.email}</span>
-        </div>
-        <Button variant="outline" size="icon" title="Cerrar sesion" onclick={signOut}>
-          <LogOut size={18} />
-        </Button>
+    <div class="flex items-center gap-3">
+      <div class="bg-[var(--primary-color)] text-white p-2.5 rounded-xl flex items-center justify-center shadow-md">
+        <LibraryBig size={24} />
       </div>
-    {/if}
+      <div>
+        <p class="eyebrow">UNESUM</p>
+        <h1>Producción Científica Docente</h1>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <Button variant="outline" size="icon" title="Cambiar tema" class="theme-toggle-btn" onclick={toggleTheme}>
+        {#if isDark}
+          <Sun size={18} class="text-amber-500" />
+        {:else}
+          <Moon size={18} class="text-emerald-800" />
+        {/if}
+      </Button>
+
+      {#if user}
+        <div class="userbox">
+          <div>
+            <strong>{user.name}</strong>
+            <span>{user.email}</span>
+          </div>
+          <Button variant="outline" size="icon" title="Cerrar sesión" onclick={signOut}>
+            <LogOut size={18} class="text-red-500" />
+          </Button>
+        </div>
+      {/if}
+    </div>
   </header>
 
   {#if !user}
     <section class="login">
-      <div>
-        <h2>Ingreso con Google Workspace</h2>
-        <p>Use su cuenta institucional @{ALLOWED_DOMAIN} para registrar y consultar su produccion.</p>
+      <div class="login-card">
+        <div class="inline-flex items-center justify-center bg-[var(--primary-color)] text-white p-4.5 rounded-2xl shadow-lg mb-6">
+          <LibraryBig size={36} />
+        </div>
+        <h2>Ingreso con Google</h2>
+        <p>Use su cuenta de correo institucional <strong>@{ALLOWED_DOMAIN}</strong> para registrar, consultar y editar su producción científica.</p>
+        
+        <div class="my-5 border-t border-dashed border-[rgba(255,255,255,0.15)] py-1"></div>
+        
         <div id="googleSignIn"></div>
       </div>
     </section>
   {:else}
     <section class="workspace">
       <Card class="sidebar">
-        <p class="label">Tipo de publicacion</p>
+        <p class="label">Tipo de publicación</p>
         <div class="type-list">
           {#each publicationTypes as type}
-            <button class:active={activeType === type.id} type="button" on:click={() => setType(type.id)}>
+            <button class:active={activeType === type.id} type="button" onclick={() => setType(type.id)}>
               <svelte:component this={icons[type.id]} size={18} />
               <span>{type.label}</span>
             </button>
@@ -192,7 +279,18 @@
           </Button>
         </div>
 
-        <form on:submit|preventDefault={() => submitForm('COMPLETO')}>
+        <!-- Form Completion Progress Bar -->
+        <div class="mb-5">
+          <div class="progress-header">
+            <span>Completitud del formulario</span>
+            <span class="progress-val">{completenessPercentage}%</span>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar" style="width: {completenessPercentage}%"></div>
+          </div>
+        </div>
+
+        <form onsubmit={handleFormSubmit}>
           <div class="form-grid">
             {#each activeFields as field, index}
               {#if field.section && field.section !== activeFields[index - 1]?.section}
@@ -259,25 +357,58 @@
         <div class="section-title">
           <div>
             <p class="label">Mis registros</p>
-            <h2>{records.length} publicaciones</h2>
+            <h2>{filteredRecords.length} publicaciones</h2>
           </div>
           <Button variant="outline" size="icon" title="Actualizar" onclick={loadRecords} disabled={loading}>
-            <RefreshCw size={18} />
+            <RefreshCw size={18} class={loading ? 'animate-spin' : ''} />
           </Button>
         </div>
+
+        <!-- Search and Filter controls -->
+        <div class="records-filter-wrapper">
+          <div class="search-input-wrapper">
+            <Input
+              type="text"
+              placeholder="Buscar por título, revista, carrera..."
+              value={searchQuery}
+              oninput={(event) => searchQuery = event.currentTarget.value}
+            />
+            <svg class="search-icon-svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+
+          <div class="filter-tabs">
+            <button class:active={statusFilter === 'ALL'} onclick={() => statusFilter = 'ALL'}>Todas</button>
+            <button class:active={statusFilter === 'COMPLETO'} onclick={() => statusFilter = 'COMPLETO'}>Completas</button>
+            <button class:active={statusFilter === 'INCOMPLETO'} onclick={() => statusFilter = 'INCOMPLETO'}>Borradores</button>
+          </div>
+        </div>
+
         {#if loading}
-          <p class="empty">Cargando registros...</p>
-        {:else if records.length === 0}
-          <p class="empty">Aun no ha registrado publicaciones.</p>
+          <div class="empty">
+            <RefreshCw size={24} class="animate-spin text-[var(--primary-color)]" />
+            <p>Cargando registros...</p>
+          </div>
+        {:else if filteredRecords.length === 0}
+          <div class="empty">
+            <p>Aún no ha registrado publicaciones con este criterio.</p>
+          </div>
         {:else}
           <div class="records">
-            {#each records as record}
+            {#each filteredRecords as record}
               <article>
                 <div class="record-head">
-                  <span>{record.type} · {record.status}</span>
-                  <Button variant="outline" size="smIcon" title="Editar registro" onclick={() => editRecord(record)}>
-                    <Pencil size={16} />
-                  </Button>
+                  <span class="badge {record.status === 'COMPLETO' ? 'badge-completo' : 'badge-borrador'}">
+                    {record.status === 'COMPLETO' ? 'Completo' : 'Borrador'}
+                  </span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider">{record.type}</span>
+                    <Button variant="outline" size="smIcon" title="Editar registro" onclick={() => editRecord(record)}>
+                      <Pencil size={14} />
+                    </Button>
+                  </div>
                 </div>
                 <h3>{record.title}</h3>
                 <p>{record.date || 'Sin fecha'} · {record.career || 'Sin carrera'}</p>
@@ -290,9 +421,15 @@
   {/if}
 
   {#if error}
-    <div class="toast error">{error}</div>
+    <div class="toast error">
+      <AlertCircle size={18} />
+      <span>{error}</span>
+    </div>
   {/if}
   {#if message}
-    <div class="toast success">{message}</div>
+    <div class="toast success">
+      <CheckCircle2 size={18} />
+      <span>{message}</span>
+    </div>
   {/if}
 </main>
