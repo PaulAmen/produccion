@@ -1,9 +1,10 @@
 {
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
-    }
-  }
+   "compilerOptions": {
+      "ignoreDeprecations": "6.0",
+      "baseUrl": ".",
+      "paths": {
+         "$lib": ["./src/lib"],
+         "$lib/*": ["./src/lib/*"]
+      }
+   }
 }
